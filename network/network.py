@@ -66,7 +66,7 @@ class PeerManager(LM.LoggingProcess):
         self.__mp_in_queue = mpQueue()
         self.__mp_out_queue = mpQueue()
         self.__message_decoder = message_decoder
-        super(PeerManager, self).__init__(log_queue=log_queue, name="Net Process", target=self._execute, args=())
+        super(PeerManager, self).__init__(log_queue=log_queue, name="Network", target=self._execute, args=())
 
     def mp_queue_get(self, block, timeout):
         return self.__mp_out_queue.get(block, timeout)
@@ -101,6 +101,8 @@ class PeerManager(LM.LoggingProcess):
         self.__info_queue = Queue.Queue()
 
         peer_id_counter = 1
+
+        LM.info("Starting Network Peer Manager")
 
         try:
             while not self.__interrupted:
@@ -161,7 +163,7 @@ class Peer(LM.LoggingThread):
         self.__message_decoder = message_decoder
         self.__interrupted = False
         self.__id = peer_id
-        super(Peer, self).__init__()
+        super(Peer, self).__init__(target=self._execute)
 
     def connect(self, host, port):
         self.__host = host
@@ -177,7 +179,7 @@ class Peer(LM.LoggingThread):
     def get_id(self):
         return self.__id
 
-    def run(self):
+    def _execute(self):
         if self.__s is None:
             self.__s = get_client_socket(self.__host, self.__port)
         if self.__s is None:

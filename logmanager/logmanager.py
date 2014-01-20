@@ -4,6 +4,7 @@ import threading
 import traceback
 import os
 import sys
+import Queue
 import multiprocessing as MP
 
 
@@ -25,17 +26,7 @@ class QueueHandler(logging.Handler):
 
 local_logger = None
 log_server = None
-
-
-def exception_handler(typ, value, traceback):
-    if local_logger:
-        local_logger.info("Caught exception")
-        # local_logger.critical("Exception thrown")
-        # local_logger.critical("Type: %s" % typ)
-        # local_logger.critical("Value: %s" % value)
-        # local_logger.critical("Traceback: %s" % traceback)
-    else:
-        print "No local logger"
+file_handler = None
 
 
 def set_log_queue(queue, process_name):
@@ -57,14 +48,19 @@ def start_log_server(level, dir_name, filename):
         print "Unable to create log directory"
     elif not os.path.exists(dir_name):
         os.makedirs(dir_name)
+
     logging.basicConfig(level=level)
+    global file_handler
     file_handler = logging.handlers.RotatingFileHandler(dir_name + "/" + filename, 'a', 102400, 5)
+
+    logging.getLogger().addHandler(file_handler)
+    logging.getLogger().info("<<<<<<<<<<<<<<<<<< Log File Opened >>>>>>>>>>>>>>>>>>")
+
     formatter = logging.Formatter(
-        fmt="%(asctime)s: %(name)s: %(levelname)s: %(message)s",
+        fmt="%(asctime)s %(name)s %(levelname)s: %(message)s",
         datefmt="%d-%m %H:%M:%S"
     )
     file_handler.setFormatter(formatter)
-    logging.getLogger().addHandler(file_handler)
     log_queue = MP.Queue()
     global log_server
     log_server = LogServer(log_queue)
@@ -88,25 +84,38 @@ class LogServer(threading.Thread):
     def _execute(self):
         record = True
         while record:
-            record = self.__log_queue.get()
+            try:
+                record = self.__log_queue.get(True, 10.0)
+            except Queue.Empty:
+                file_handler.flush()
+                record = True
+                continue
             if record:
                 self.__root_logger.handle(record)
 
 
+def log_exception():
+    if local_logger:
+        exception_info = traceback.format_exception(*sys.exc_info())
+        for line in exception_info:
+            sub_lines = line.splitlines()
+            for sub_line in sub_lines:
+                local_logger.critical(sub_line)
+
+
 class LoggingThread(threading.Thread):
-        def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
+        def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, verbose=None):
             self.__target = target
             self.__args = args
             self.__kwargs = kwargs
-            super(LoggingThread, self).__init__(group, self.__execute_wrapper, name, None, None, verbose)
+            super(LoggingThread, self).__init__(group, self.__execute_wrapper, name, (), {}, verbose)
 
         def __execute_wrapper(self):
             try:
                 if self.__target:
                     self.__target(*self.__args, **self.__kwargs)
-            except Exception as e:
-                if local_logger:
-                    local_logger.exception(e)
+            except Exception:
+                log_exception()
 
 
 class LoggingProcess(MP.Process):
@@ -114,7 +123,7 @@ class LoggingProcess(MP.Process):
         if not name:
             raise Exception
 
-        self.__name = name
+        self.__name = name.ljust(10, ' ')
         self.__log_queue = log_queue
         self.__target = target
         self.__args = args
@@ -126,10 +135,5 @@ class LoggingProcess(MP.Process):
         try:
             if self.__target:
                 self.__target(*self.__args, **self.__kwargs)
-        except Exception as e:
-            if local_logger:
-                exception_info = traceback.format_exception(*sys.exc_info())
-                for line in exception_info:
-                    sub_lines = line.splitlines()
-                    for sub_line in sub_lines:
-                        local_logger.critical(sub_line)
+        except Exception:
+            log_exception()
