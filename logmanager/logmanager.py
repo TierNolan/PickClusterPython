@@ -2,10 +2,11 @@ import logging
 import logging.handlers
 import threading
 import traceback
-import os
 import sys
+import os
 import Queue
 import multiprocessing as MP
+import atexit
 
 
 class QueueHandler(logging.Handler):
@@ -26,7 +27,6 @@ class QueueHandler(logging.Handler):
 
 local_logger = None
 log_server = None
-file_handler = None
 
 
 def set_log_queue(queue, process_name):
@@ -44,44 +44,51 @@ def info(message):
 
 
 def start_log_server(level, dir_name, filename):
-    if os.path.isfile(dir_name):
-        print "Unable to create log directory"
-    elif not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-
-    logging.basicConfig(level=level)
-    global file_handler
-    file_handler = logging.handlers.RotatingFileHandler(dir_name + "/" + filename, 'a', 102400, 5)
-
-    logging.getLogger().addHandler(file_handler)
-    logging.getLogger().info("<<<<<<<<<<<<<<<<<< Log File Opened >>>>>>>>>>>>>>>>>>")
-
-    formatter = logging.Formatter(
-        fmt="%(asctime)s %(name)s %(levelname)s: %(message)s",
-        datefmt="%d-%m %H:%M:%S"
-    )
-    file_handler.setFormatter(formatter)
     log_queue = MP.Queue()
     global log_server
-    log_server = LogServer(log_queue)
+    log_server = LogServer(dir_name, filename, log_queue, level)
     log_server.start()
+    set_log_queue(log_queue, "Main")
+    info("<<<<<<<<<<<<<<<<<< Log File Opened >>>>>>>>>>>>>>>>>>")
+    atexit.register(stop_log_server)
     return log_queue
 
 
 def stop_log_server():
     log_server.shutdown()
+    log_server.join()
 
 
-class LogServer(threading.Thread):
-    def __init__(self, log_queue):
-        super(LogServer, self).__init__(target=self._execute)
+class LogServer(MP.Process):
+    def __init__(self, dir_name, filename, log_queue, level):
+        super(LogServer, self).__init__(name="Log Server Thread", target=self._execute)
+        self.__filename = filename
+        self.__dir_name = dir_name
         self.__log_queue = log_queue
-        self.__root_logger = logging.getLogger()
+        self.__level = level
 
     def shutdown(self):
         self.__log_queue.put(None)
 
     def _execute(self):
+        if os.path.isfile(self.__dir_name):
+            print "Unable to create log directory"
+        elif not os.path.exists(self.__dir_name):
+            os.makedirs(self.__dir_name)
+
+        root_logger = logging.getLogger()
+
+        logging.basicConfig(level=self.__level)
+        file_handler = logging.handlers.RotatingFileHandler(self.__dir_name + "/" + self.__filename, 'a', 1024*100, 5)
+
+        logging.getLogger().addHandler(file_handler)
+
+        formatter = logging.Formatter(
+            fmt="%(asctime)s %(name)s %(levelname)s: %(message)s",
+            datefmt="%d-%m %H:%M:%S"
+        )
+
+        file_handler.setFormatter(formatter)
         record = True
         while record:
             try:
@@ -91,7 +98,7 @@ class LogServer(threading.Thread):
                 record = True
                 continue
             if record:
-                self.__root_logger.handle(record)
+                root_logger.handle(record)
 
 
 def log_exception():

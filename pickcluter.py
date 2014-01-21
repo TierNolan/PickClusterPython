@@ -4,6 +4,7 @@ import multiprocessing as MP
 import sys
 import logging
 import logmanager.logmanager as LM
+import time
 
 if __name__ == '__main__':
     MP.freeze_support()
@@ -23,6 +24,3 @@ if __name__ == '__main__':
     sys.stdin.readline()
 
     p.shutdown()
-
-    LM.stop_log_server()
-

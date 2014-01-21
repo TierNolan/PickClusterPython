@@ -79,6 +79,7 @@ class PeerManager(LM.LoggingProcess):
 
     def shutdown(self):
         self.mp_queue_put((self.CMD_SHUTDOWN, ))
+        self.join()
 
     def _add_peer(self, peer):
         assert(isinstance(peer, Peer))
