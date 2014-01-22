@@ -57,29 +57,3 @@ class TargetBits(object):
         return self.__encoded
 
 
-RETARGET_TIMESPAN = 14 * 24 * 60 * 60
-
-def get_standard_target(protocol_info, targets, timestamps, height):
-    if len(targets) <= height - 1:
-        raise None
-
-    prev_target = targets[height - 1]
-
-    if (height % 2016) != 0:
-        return prev_target
-
-    start_timestamp = timestamps[height - 2016]
-    end_timestamp = timestamps[height - 1]
-
-    timespan = end_timestamp - start_timestamp
-
-    if timespan < RETARGET_TIMESPAN // 4:
-        timespan = RETARGET_TIMESPAN // 4
-
-    elif timespan > RETARGET_TIMESPAN * 4:
-        timespan = RETARGET_TIMESPAN * 4
-
-    new_target = (prev_target * timespan) // RETARGET_TIMESPAN
-
-    return bits_to_target(target_to_bits(new_target))
-

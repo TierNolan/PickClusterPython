@@ -12,6 +12,43 @@ class SubsidyCalculator(object):
     def get_subsidy(self, height):
         return self.__initial_payout >> ((height + self.__offset) // self.__height)
 
+
+class TargetCalculator(object):
+    def __init__(self, retarget_timespan, retarget_start, retarget_end, retarget_period):
+        self.__retarget_timespan = retarget_timespan
+        self.__retarget_start = retarget_start
+        self.__retarget_end = retarget_end
+        self.__retarget_period = retarget_period
+
+    def get_standard_target(self, targets, timestamps, height):
+        if len(targets) <= height - 1:
+            raise ProtocolError()
+
+        if len(timestamps) != len(targets):
+            raise ProtocolError
+
+        prev_target = targets[height - 1]
+
+        if (height % self.__retarget_period) != 0:
+            return prev_target
+
+        start_timestamp = timestamps[height - self.__retarget_start]
+        end_timestamp = timestamps[height - self.__retarget_end]
+
+        timespan = end_timestamp - start_timestamp
+
+        retarget_timespan = self.__retarget_timespan
+
+        if timespan < retarget_timespan // 4:
+            timespan = retarget_timespan // 4
+
+        elif timespan > retarget_timespan * 4:
+            timespan = retarget_timespan * 4
+
+        new_target = (prev_target * timespan) // retarget_timespan
+
+        return Messages.bits_to_target(Messages.target_to_bits(new_target))
+
 class ProtocolInfo(object):
 
     def __init__(self,
@@ -176,7 +213,7 @@ MAIN_NET_INFO = ProtocolInfo("bitcoin_main",
                              8332,
                              1 << 32,
                              SubsidyCalculator(50*100000000, 210000, 1),
-                             Messages.get_standard_target,
+                             TargetCalculator(14 * 24 * 60 * 60, 2016, 1, 2016),
                              convert_fixed_seeds(MAIN_NET_FIXED_SEEDS),
                              ['seed.bitcoin.sipa.be',
                               'dnsseed.bluematt.me',
@@ -199,7 +236,7 @@ TEST_NET_INFO = ProtocolInfo("bitcoin_test3",
                              18332,
                              1 << 32,
                              SubsidyCalculator(50*100000000, 210000, 1),
-                             Messages.get_standard_target,
+                             TargetCalculator(14 * 24 * 60 * 60, 2016, 1, 2016),
                              convert_fixed_seeds(MAIN_NET_FIXED_SEEDS),
                              ['testnet-seed.bitcoin.petertodd.org',
                               'testnet-seed.bluematt.me'
