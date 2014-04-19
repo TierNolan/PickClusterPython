@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 _failed = 0
 _passed = 0
 _skipped = 0
@@ -6,7 +8,7 @@ _skipped = 0
 def run_test(test_module_name):
     print
     test_module = __import__(test_module_name, globals(), locals(), [], -1)
-    print test_module.get_name()
+    print (test_module.get_name())
     tests = test_module.get_tests()
     for test_info in tests:
         test_name = test_info[0]
@@ -30,18 +32,18 @@ def run_test(test_module_name):
                 result = 'FAILED (' + ae.message + ')'
                 global _failed
                 _failed += 1
-        print "  " + test_name + ": " + result
+        print ("  " + test_name + ": " + result)
 
 run_test('difficulty_target_test')
 run_test('byte_array_codec_test')
 
 print
-print "Test Results"
-print "Passed %d" % _passed
-print "Failed %d" % _failed
-print "Skipped %d" % _skipped
+print ("Test Results")
+print ("Passed %d" % _passed)
+print ("Failed %d" % _failed)
+print ("Skipped %d" % _skipped)
 print
 if _failed > 0:
-    print "<<<<< TEST FAILURES >>>>"
+    print ("<<<<< TEST FAILURES >>>>")
 else:
-    print "<<<<< TESTS PASSED >>>>>"
+    print ("<<<<< TESTS PASSED >>>>>")

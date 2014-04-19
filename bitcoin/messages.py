@@ -1,4 +1,8 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import bitcoin.byte_array_codec
+
+BAC = bitcoin.byte_array_codec
 
 def target_to_bits(i):
     neg = i < 0
@@ -57,3 +61,48 @@ class TargetBits(object):
         return self.__encoded
 
 
+CLIENT_NAME = "PickCluster"
+
+class NetworkAddress(object):
+    def __init__(self, timestamp, services, address, port):
+        self.__timestamp = timestamp
+        self.__services = services
+        self.__address = address
+        self.__port = port
+        self.__is_ip4 = self.__address[0:10] == ("\x00" * 10 + "\xFF" * 2)
+
+    def get_address(self):
+        a = self.__address
+
+
+class VerAck(object):
+
+    def __init__(self):
+        pass
+
+    def decode(self, data):
+        pass
+
+    def encode(self):
+        return str("")
+
+class Version(object):
+
+    def __init__(self, version=0, services=0, timestamp=0, address_to=None, address_from=None, connect_id=0, client_name=CLIENT_NAME, height=0, relay=0):
+        self.__version = version
+        self.__services = services
+        self.__timestamp = timestamp
+        self.__address_to = address_to
+        self.__address_from = address_from
+        self.__connect_id = connect_id
+        self.__client_name = client_name
+        self.__height = height
+        self.__relay = relay
+
+    def decode(self, data):
+        decode = BAC.BinDecoder(data)
+
+        self.__version = decode.get_int()
+        self.__services = decode.get_long()
+        self.__timestamp = decode.get_int()
+        self.__address_to = decode.get_net_address()

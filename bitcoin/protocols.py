@@ -1,4 +1,6 @@
-import messages as Messages
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import bitcoin.messages
 
 class ProtocolError(Exception): pass
 
@@ -47,6 +49,7 @@ class TargetCalculator(object):
 
         new_target = (prev_target * timespan) // retarget_timespan
 
+        Messages = bitcoin.messages
         return Messages.bits_to_target(Messages.target_to_bits(new_target))
 
 class ProtocolInfo(object):

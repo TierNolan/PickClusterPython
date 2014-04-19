@@ -1,5 +1,10 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import random
-import binutils.byte_array_codec as BAC
+
+import bitcoin.bitcoin_codec.byte_array_codec
+
+BAC = bitcoin.bitcoin_codec.byte_array_codec
 
 ByteEnc = BAC.BinEncoder
 ByteDec = BAC.BinDecoder

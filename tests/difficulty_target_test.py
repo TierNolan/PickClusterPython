@@ -1,15 +1,18 @@
-import bitcoin.messages as Messages
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import bitcoin.bitcoin_codec.messages
+
+Messages = bitcoin.bitcoin_codec.messages
 
 TEST_FULL_DIFFICULTY = False
-
 
 def test_difficulty_full():
     """ Checks all 2 ** 32 possible int encodings, encode(decode(x)) == x """
     if not TEST_FULL_DIFFICULTY:
-        print "Full difficulty target encoding/decoding check: skipped"
+        print ("Full difficulty target encoding/decoding check: skipped")
         return
 
-    print "Running difficulty target encoding/decoding check"
+    print ("Running difficulty target encoding/decoding check")
     encoded = 0
     while encoded < 2 ** 32:
         decoded = Messages.bits_to_target(encoded)
@@ -38,7 +41,7 @@ def test_difficulty_full():
                                      (encoded, decoded, reencoded, masked)
         encoded += 1
         if encoded % 10000000 == 0:
-            print "Full test progress %0.2f%%" % ((100.0 * encoded) / 2 ** 32)
+            print ("Full test progress %0.2f%%" % ((100.0 * encoded) / 2 ** 32))
 
 TARGET_TEST_VECTORS = [
     # decoder input, decoded, re-encoded

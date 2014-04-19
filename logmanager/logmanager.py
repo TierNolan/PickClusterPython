@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import logging
 import logging.handlers
 import threading
@@ -5,8 +7,10 @@ import traceback
 import sys
 import os
 import Queue
-import multiprocessing as MP
+import multiprocessing
 import atexit
+
+MP = multiprocessing
 
 
 class QueueHandler(logging.Handler):
@@ -72,7 +76,7 @@ class LogServer(MP.Process):
 
     def _execute(self):
         if os.path.isfile(self.__dir_name):
-            print "Unable to create log directory"
+            print ("Unable to create log directory")
         elif not os.path.exists(self.__dir_name):
             os.makedirs(self.__dir_name)
 

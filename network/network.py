@@ -1,9 +1,12 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import socket
-from threading import Thread
-from multiprocessing import Process
-from multiprocessing import Queue as mpQueue
+import multiprocessing
 import Queue
-import logmanager.logmanager as LM
+import logmanager.logmanager
+
+LM = logmanager.logmanager
+mpQueue = multiprocessing.Queue
 
 class DecodeError(Exception): pass
 class EncodeError(Exception): pass
@@ -121,6 +124,7 @@ class PeerManager(LM.LoggingProcess):
                         host = mp_data[1]
                         port = mp_data[2]
                         peer_thread = Peer(self, peer_id_counter, self.__message_decoder)
+                        print ("connecting to %d %s %d" % (peer_id_counter, host, port))
                         peer_thread.connect(host, port)
                         peer_thread.start()
                     elif mp_command == self.CMD_DISCONNECT:
