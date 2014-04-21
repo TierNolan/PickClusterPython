@@ -1,8 +1,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import bitcoin.bitcoin_codec.messages
+import bitcoin.messages
 
-Messages = bitcoin.bitcoin_codec.messages
+Messages = bitcoin.messages
 
 TEST_FULL_DIFFICULTY = False
 

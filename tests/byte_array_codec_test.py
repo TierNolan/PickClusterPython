@@ -1,10 +1,11 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import random
+import binascii
 
-import bitcoin.bitcoin_codec.byte_array_codec
+import bitcoin.byte_array_codec
 
-BAC = bitcoin.bitcoin_codec.byte_array_codec
+BAC = bitcoin.byte_array_codec
 
 ByteEnc = BAC.BinEncoder
 ByteDec = BAC.BinDecoder
@@ -22,7 +23,7 @@ def test_codec(endian, put_func, get_func, valid_range):
     for i in r:
         put_func(enc, i)
 
-    dec = BAC.BinDecoder(enc.as_string())
+    dec = BAC.BinDecoder(enc.as_byte_array())
     dec.set_endian(endian)
 
     for i in range(0, 100):
@@ -62,18 +63,14 @@ def test_mixed_types():
     enc.put_int(0x12345678)
     enc.put_long(0x1234567811111111)
 
-    s = "Test string"
-    enc.put_string(s)
-
     b = bytearray(b'\x11\x22\x33\x44\x55\x66\x77\x88')
     enc.put_byte_array(b)
 
-    dec = BAC.BinDecoder(enc.as_string())
+    dec = BAC.BinDecoder(enc.as_byte_array())
     assert(dec.get_byte() == 0x12)
     assert(dec.get_short() == 0x1234)
     assert(dec.get_int() == 0x12345678)
     assert(dec.get_long() == 0x1234567811111111)
-    assert(dec.get_string(len(s)) == s)
     assert(dec.get_byte_array(len(b)) == b)
 
 
@@ -84,9 +81,9 @@ def test_endian():
     enc.put_int(0x12345678)
     enc.put_long(0x1234567844444444)
 
-    exp = "3412785634124444444478563412"
-    assert(enc.as_string().encode('hex') == exp), "Endian error, got %s, expected %s" % \
-                                                                (enc.as_string().encode('hex'), exp)
+    exp = binascii.unhexlify(b"3412785634124444444478563412")
+    assert(enc.as_byte_array() == exp), "Endian error, got %s, expected %s" % \
+                                                                (enc.as_byte_array(), exp)
 
     enc = BAC.BinEncoder()
     enc.set_endian(BAC.BE)
@@ -94,9 +91,9 @@ def test_endian():
     enc.put_int(0x12345678)
     enc.put_long(0x1234567844444444)
 
-    exp = "1234123456781234567844444444"
-    assert(enc.as_string().encode('hex') == exp), "Endian error, got %s, expected %s" % \
-                                                   (enc.as_string().encode('hex'), exp)
+    exp = binascii.unhexlify(b"1234123456781234567844444444")
+    assert(enc.as_byte_array() == exp), "Endian error, got %s, expected %s" % \
+                                                   (enc.as_byte_array(), exp)
 
 
 def get_tests():

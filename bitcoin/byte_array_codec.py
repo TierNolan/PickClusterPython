@@ -10,8 +10,9 @@ LE, BE = "<", ">"
 
 class BinDecoder(object):
 
-    def __init__(self, s):
-        self.__str = s
+    def __init__(self, b):
+        assert(isinstance(b, bytearray))
+        self.__buf = b
         self.__i = 0
         self.__endian = LE
 
@@ -43,24 +44,21 @@ class BinDecoder(object):
         return self.__get('q', 8)
 
     def __get(self, code, length):
-        if self.__i + length > len(self.__str):
+        if self.__i + length > len(self.__buf):
             raise DecoderEOF
-        section = self.__str[self.__i:self.__i + length]
-        value = struct.unpack(self.__endian + code, section)[0]
+        section = self.__buf[self.__i:self.__i + length]
+        value = struct.unpack((self.__endian + code).encode('utf-8'), section)[0]
         self.__i += length
         return value
 
     def get_string(self, length):
-        if self.__i + length > len(self.__str):
-            raise DecoderEOF
-        value = self.__str[self.__i: self.__i + length]
-        self.__i += length
+        value = str(self.get_byte_array(length))
         return value
 
     def get_byte_array(self, length):
-        if self.__i + length > len(self.__str):
+        if self.__i + length > len(self.__buf):
             raise DecoderEOF
-        value = bytearray(self.__str[self.__i: self.__i + length])
+        value = self.__buf[self.__i: self.__i + length]
         self.__i += length
         return value
 
@@ -75,15 +73,13 @@ class BinDecoder(object):
         import bitcoin.messages
         return bitcoin.messages.NetworkAddress(timestamp, services, address, port)
 
-
     def get_remaining_buf(self):
-        return bytearray(self.__str[self.__i:])
-
+        return bytearray(self.__buf[self.__i:])
 
 class BinEncoder(object):
 
     def __init__(self):
-        self.__str = ""
+        self.__buf = bytearray()
         self.__i = 0
         self.__endian = LE
 
@@ -92,25 +88,27 @@ class BinEncoder(object):
 
     def put_byte(self, b):
         b &= 0xFF
-        self.__str += struct.pack(self.__endian + 'B', b)
+        self.put_byte_array(self.call_struct_pack(self.__endian + 'B', b))
 
     def put_short(self, s):
         s &= 0xFFFF
-        self.__str += struct.pack(self.__endian + 'H', s)
+        self.put_byte_array(self.call_struct_pack(self.__endian + 'H', s))
 
     def put_int(self, i):
         i &= 0xFFFFFFFF
-        self.__str += struct.pack(self.__endian + 'I', i)
+        self.put_byte_array(self.call_struct_pack(self.__endian + 'I', i))
 
     def put_long(self, l):
         l &= 0xFFFFFFFFFFFFFFFFL
-        self.__str += struct.pack(self.__endian + 'Q', l)
+        self.put_byte_array(self.call_struct_pack(self.__endian + 'Q', l))
 
-    def put_string(self, s):
-        self.__str += s
+    def call_struct_pack(self, t, value):
+        type_str = t.encode('utf-8')
+        return struct.pack(type_str, value)
 
     def put_byte_array(self, buf):
-        self.__str += str(buf)
+        for b in buf:
+            self.__buf.append(b)
 
-    def as_string(self):
-        return self.__str
+    def as_byte_array(self):
+        return bytearray(self.__buf)
