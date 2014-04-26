@@ -6,7 +6,6 @@ import Queue
 import logmanager.logmanager
 
 LM = logmanager.logmanager
-mpQueue = multiprocessing.Queue
 
 class DecodeError(Exception): pass
 class EncodeError(Exception): pass
@@ -65,17 +64,8 @@ class PeerManager(LM.LoggingProcess):
     def __init__(self, message_decoder, log_queue):
         self.__peers = {}
         self.__info_queue = None
-        self.__interrupted = False
-        self.__mp_in_queue = mpQueue()
-        self.__mp_out_queue = mpQueue()
         self.__message_decoder = message_decoder
         super(PeerManager, self).__init__(log_queue=log_queue, name="Network", target=self._execute, args=())
-
-    def mp_queue_get(self, block, timeout):
-        return self.__mp_out_queue.get(block, timeout)
-
-    def mp_queue_put(self, value):
-        self.__mp_in_queue.put(value)
 
     def connect(self, hostname, port):
         self.mp_queue_put((self.CMD_CONNECT, hostname, port))
@@ -106,13 +96,13 @@ class PeerManager(LM.LoggingProcess):
 
         peer_id_counter = 1
 
-        LM.info("Starting Network Peer Manager")
+        LM.info("Starting Network Manager")
 
         try:
-            while not self.__interrupted:
+            while not self._interrupted:
                 while True:
                     try:
-                        mp_data = self.__mp_in_queue.get(False)
+                        mp_data = self._mp_queue_get_internal(False)
                     except Queue.Empty:
                         mp_data = None
                     if not mp_data:
@@ -124,7 +114,6 @@ class PeerManager(LM.LoggingProcess):
                         host = mp_data[1]
                         port = mp_data[2]
                         peer_thread = Peer(self, peer_id_counter, self.__message_decoder)
-                        print ("connecting to %d %s %d" % (peer_id_counter, host, port))
                         peer_thread.connect(host, port)
                         peer_thread.start()
                     elif mp_command == self.CMD_DISCONNECT:
@@ -136,21 +125,21 @@ class PeerManager(LM.LoggingProcess):
                         return
                 try:
                     data = self.__info_queue.get(True, 0.25)
-                except Queue.Empty as e:
+                except Queue.Empty:
                     continue
                 command = data[0]
                 peer = data[1]
                 if command == self.INFO_CONNECTED:
                     self.__peers[peer_id_counter] = peer
-                    self.__mp_out_queue.put((self.INFO_CONNECTED, peer.get_id()))
+                    self._mp_queue_put_internal((self.INFO_CONNECTED, peer.get_id(), peer.get_hostname(), peer.get_port()))
                     peer_id_counter += 1
                 elif command == self.INFO_DISCONNECTED:
                     del self.__peers[peer.get_id()]
-                    self.__mp_out_queue.put((self.INFO_DISCONNECTED, peer.get_id()))
+                    self._mp_queue_put_internal((self.INFO_DISCONNECTED, peer.get_id(), peer.get_hostname(), peer.get_port()))
                 elif command == self.INFO_CONNECT_FAILED:
-                    self.__mp_out_queue.put((self.INFO_CONNECT_FAILED, peer.get_id()))
+                    self._mp_queue_put_internal((self.INFO_CONNECT_FAILED, peer.get_id(), peer.get_hostname(), peer.get_port()))
                 elif command == self.INFO_MSG_RECEIVED:
-                    self.__mp_out_queue.put((self.INFO_MSG_RECEIVED, peer.get_id(), data[2]))
+                    self._mp_queue_put_internal((self.INFO_MSG_RECEIVED, peer.get_id(), data[2]))
         finally:
             for p in self.__peers.values():
                 p.interrupt()
@@ -183,6 +172,12 @@ class Peer(LM.LoggingThread):
 
     def get_id(self):
         return self.__id
+
+    def get_hostname(self):
+        return self.__host
+
+    def get_port(self):
+        return self.__port
 
     def _execute(self):
         if self.__s is None:

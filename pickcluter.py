@@ -5,28 +5,31 @@ import network.network
 import multiprocessing
 import sys
 import logging
+import bitcoin.node
+import time
+
 import logmanager.logmanager
 
 Protocols = bitcoin.protocols
 Net = network.network
 MP = multiprocessing
 LM = logmanager.logmanager
+NODE = bitcoin.node
 
 if __name__ == '__main__':
     MP.freeze_support()
 
     log_queue = LM.start_log_server(logging.DEBUG, "log", "pick_cluster.log")
 
-    p = Net.PeerManager(Protocols.MAIN_NET_INFO, log_queue)
+    #node = Net.PeerManager(Protocols.MAIN_NET_INFO, log_queue)
+    node = NODE.Node(log_queue, 10000)
 
-    p.start()
+    node.start()
 
-    p.connect("localhost", 8333)
+    time.sleep(1)
 
-    result = p.mp_queue_get(True, None)
-
-    print(result)
+    node.connect("localhost", 18333)
 
     sys.stdin.readline()
 
-    p.shutdown()
+    node.shutdown()

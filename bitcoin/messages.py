@@ -84,7 +84,7 @@ class VerAck(object):
         pass
 
     def encode(self):
-        return str("")
+        return bytearray()
 
 class Version(object):
 
