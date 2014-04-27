@@ -22,12 +22,13 @@ if __name__ == '__main__':
     log_queue = LM.start_log_server(logging.DEBUG, "log", "pick_cluster.log")
 
     #node = Net.PeerManager(Protocols.MAIN_NET_INFO, log_queue)
-    node = NODE.Node(log_queue, 10000)
+    node = NODE.Node(log_queue, 10000, Protocols.TEST_NET_INFO)
 
     node.start()
 
     time.sleep(1)
 
+    # node.connect("::1", 18333)
     node.connect("localhost", 18333)
 
     sys.stdin.readline()

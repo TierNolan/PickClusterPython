@@ -7,6 +7,7 @@ class DecoderEOF(DecoderError): pass
 
 LE, BE = "<", ">"
 
+LONG_MASK = 0xFFFFFFFFFFFFFFFFL
 
 class BinDecoder(object):
 
@@ -25,6 +26,9 @@ class BinDecoder(object):
     def get_byte(self):
         return self.__get('b', 1)
 
+    def get_boolean(self):
+        return self.get_byte() != 0
+
     def get_ushort(self):
         return self.__get('H', 2)
 
@@ -36,6 +40,17 @@ class BinDecoder(object):
 
     def get_int(self):
         return self.__get('i', 4)
+
+    def get_var_int(self):
+        b = self.get_ubyte()
+        if b < 0xFD:
+            return b
+        elif b == 0xFD:
+            return self.get_ushort()
+        elif b == 0xFE:
+            return self.get_uint()
+        else:
+            return self.get_ulong()
 
     def get_ulong(self):
         return self.__get('Q', 8)
@@ -90,6 +105,12 @@ class BinEncoder(object):
         b &= 0xFF
         self.put_byte_array(self.call_struct_pack(self.__endian + 'B', b))
 
+    def put_boolean(self, b):
+        if b:
+            self.put_byte(1)
+        else:
+            self.put_byte(0)
+
     def put_short(self, s):
         s &= 0xFFFF
         self.put_byte_array(self.call_struct_pack(self.__endian + 'H', s))
@@ -98,8 +119,22 @@ class BinEncoder(object):
         i &= 0xFFFFFFFF
         self.put_byte_array(self.call_struct_pack(self.__endian + 'I', i))
 
+    def put_var_int(self, i):
+        i &= LONG_MASK
+        if i < 0xFD:
+            self.put_byte(i)
+        elif i <= 0xFFFF:
+            self.put_byte(0xFD)
+            self.put_short(i)
+        elif i <= 0xFFFFFFFF:
+            self.put_byte(0xFE)
+            self.put_int(i)
+        else:
+            self.put_byte(0xFF)
+            self.put_long(i)
+
     def put_long(self, l):
-        l &= 0xFFFFFFFFFFFFFFFFL
+        l &= LONG_MASK
         self.put_byte_array(self.call_struct_pack(self.__endian + 'Q', l))
 
     def call_struct_pack(self, t, value):
