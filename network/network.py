@@ -60,7 +60,7 @@ class PeerManager(LM.LoggingProcess):
 
     INFO_CONNECTED, INFO_DISCONNECTED, INFO_CONNECT_FAILED, INFO_MSG_RECEIVED = range(4)
 
-    CMD_CONNECT, CMD_DISCONNECT, CMD_SEND_MESSAGE, CMD_SHUTDOWN = range(4)
+    CMD_CONNECT, CMD_DISCONNECT, CMD_SEND_MESSAGE, CMD_SHUTDOWN, CMD_SET_VERSION = range(5)
 
     def __init__(self, protocol_info, log_queue):
         self.__peers = {}
@@ -70,6 +70,12 @@ class PeerManager(LM.LoggingProcess):
 
     def connect(self, hostname, port):
         self.mp_queue_put((self.CMD_CONNECT, hostname, port))
+
+    def disconnect(self, peer_id):
+        self.mp_queue_put((self.CMD_DISCONNECT, peer_id))
+
+    def set_version(self, peer_id, version):
+        self.mp_queue_put((self.CMD_SET_VERSION, peer_id, version))
 
     def shutdown(self):
         self.mp_queue_put((self.CMD_SHUTDOWN, ))
@@ -132,6 +138,11 @@ class PeerManager(LM.LoggingProcess):
                         message = mp_data[4]
                         p = self.__peers.get(peer_id)
                         p.peer_send_thread.send(version, command, message)
+                    elif mp_command == self.CMD_SET_VERSION:
+                        peer_id = mp_data[1]
+                        version = mp_data[2]
+                        p = self.__peers.get(peer_id)
+                        p.set_version(version)
                     elif mp_command == self.CMD_SHUTDOWN:
                         return
                 try:
@@ -142,13 +153,16 @@ class PeerManager(LM.LoggingProcess):
                 peer = data[1]
                 if command == self.INFO_CONNECTED:
                     self.__peers[peer_id_counter] = peer
-                    self._mp_queue_put_internal((self.INFO_CONNECTED, peer.get_id(), peer.get_hostname(), peer.get_ip(), peer.get_port()))
+                    self._mp_queue_put_internal((self.INFO_CONNECTED, peer.get_id(), peer.get_hostname(), peer.get_ip(),
+                                                 peer.get_port()))
                     peer_id_counter += 1
                 elif command == self.INFO_DISCONNECTED:
                     del self.__peers[peer.get_id()]
-                    self._mp_queue_put_internal((self.INFO_DISCONNECTED, peer.get_id(), peer.get_hostname(), peer.get_port()))
+                    self._mp_queue_put_internal((self.INFO_DISCONNECTED, peer.get_id(), peer.get_hostname(),
+                                                 peer.get_port()))
                 elif command == self.INFO_CONNECT_FAILED:
-                    self._mp_queue_put_internal((self.INFO_CONNECT_FAILED, peer.get_id(), peer.get_hostname(), peer.get_port()))
+                    self._mp_queue_put_internal((self.INFO_CONNECT_FAILED, peer.get_id(), peer.get_hostname(),
+                                                 peer.get_port()))
                 elif command == self.INFO_MSG_RECEIVED:
                     self._mp_queue_put_internal((self.INFO_MSG_RECEIVED, peer.get_id(), data[2]))
         finally:
@@ -276,7 +290,7 @@ class Peer(LM.LoggingThread):
                         break
                     buf.extend(chunk)
                     msg = True
-                    while msg:
+                    while msg and not self.__interrupted:
                         msg, buf = self.__message_codec.decode_message(buf, self.__version)
                         if msg:
                             self.__peer_holder._message_received(self, msg)

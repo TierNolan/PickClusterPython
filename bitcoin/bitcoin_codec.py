@@ -48,9 +48,12 @@ class MessageCodec(object):
 
         if expected_crc == crc:
             message_class = bitcoin.messages.get_message(command)
-            message = message_class()
-            decoder = BAC.BinDecoder(data)
-            message.decode(version, decoder)
+            if message_class:
+                message = message_class()
+                decoder = BAC.BinDecoder(data)
+                message.decode(version, decoder)
+            else:
+                message = None
             for i in range(12):
                 if command[11 - i] != '\x00':
                     return (command[0:(12 - i)], message), byte_stream.get_remaining_buf()

@@ -239,4 +239,7 @@ for key, value in message_map.iteritems():
 
 
 def get_message(command):
-    return byte_array_message_map[str(command)]
+    try:
+        return byte_array_message_map[str(command)]
+    except KeyError:
+        return None
