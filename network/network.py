@@ -142,7 +142,8 @@ class PeerManager(LM.LoggingProcess):
                         peer_id = mp_data[1]
                         version = mp_data[2]
                         p = self.__peers.get(peer_id)
-                        p.set_version(version)
+                        if p:  # peer could shutdown while command is in transit
+                            p.set_version(version)
                     elif mp_command == self.CMD_SHUTDOWN:
                         return
                 try:
@@ -216,7 +217,6 @@ def convert_ip(peer_name):
             else:
                 as_int = int(word, 16)
                 if as_int < 0 or as_int > 0xFFFF:
-                    print ("out of range")
                     return None
                 byte_array_code.put_short(as_int)
         return byte_array_code.as_byte_array()

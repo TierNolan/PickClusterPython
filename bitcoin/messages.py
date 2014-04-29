@@ -7,7 +7,7 @@ import binascii
 BAC = bitcoin.byte_array_codec
 NET = network.network
 
-PROTOCOL_VERSION = 70003
+PROTOCOL_VERSION = 70002
 PROTOCOL_SERVICES = 0
 PROTOCOL_MIN_VERSION = 60000
 
@@ -225,9 +225,73 @@ class Version(object):
             encoder.put_boolean(self.relay)
 
 
+class Reject(object):
+
+    def __init__(self, message="", ccode=0, reason=""):
+        self.message = message
+        self.ccode = ccode
+        self.reason = reason
+
+    def __repr__(self):
+        return "{Reject: message=%s, code=%d, reason=%s}" % (self.message, self.ccode, self.reason)
+
+    def decode(self, version, decoder):
+        self.message = VarString()
+        self.message.decode(0, decoder)
+        self.message.decode_string()
+
+        self.ccode = decoder.get_byte()
+
+        self.reason = VarString()
+        self.reason.decode(0, decoder)
+        self.reason.decode_string()
+
+    def encode(self, version, encoder):
+        self.message.encode(version, encoder)
+        encoder.put_byte(self.ccode)
+        self.reason.encode(version, encoder)
+
+
+class Ping(object):
+
+    def __init__(self, nonce=0):
+        self.nonce = nonce
+
+    def __repr__(self):
+        return "{Ping: nonce=%d}" % self.nonce
+
+    def decode(self, version, decoder):
+
+        if version > 60000:
+            self.nonce = decoder.get_ulong()
+        else:
+            self.nonce = 0
+
+    def encode(self, version, encoder):
+        if version > 60000:
+            encoder.put_long(self.nonce)
+
+
+class Pong(object):
+
+    def __init__(self, nonce=0):
+        self.nonce = nonce
+
+    def __repr__(self):
+        return "{Pong: nonce=%d}" % self.nonce
+
+    def decode(self, version, decoder):
+        self.nonce = decoder.get_ulong()
+
+    def encode(self, version, encoder):
+        encoder.put_long(self.nonce)
+
 message_map = {
     u"version": Version,
-    u"verack": VerAck
+    u"verack": VerAck,
+    u"reject": Reject,
+    u"ping": Ping,
+    u"pong": Pong
 }
 
 byte_array_message_map = {}

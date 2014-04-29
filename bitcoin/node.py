@@ -5,6 +5,7 @@ import bitcoin.protocols
 import Queue
 import logmanager.logmanager
 import bitcoin.messages
+import bitcoin.ping_manager
 import bitcoin.bitcoin_codec
 import time
 import binascii
@@ -27,6 +28,9 @@ class PeerHandle(object):
         self.outgoing = outgoing
         self.version = 0
         self.tolerance = 100
+        self.ping_nonce = 0
+        self.ping_time = None
+        self.latency = None
 
     def __repr__(self):
         return "{id=%d, %s : %d, outgoing=%r, version=%d}" % \
@@ -42,6 +46,15 @@ class PeerHandle(object):
         self.version = version
         self.node.get_peer_manager().set_version(self.peer_id, version)
 
+    def send_message(self, command, message):
+        self.node.send_message(self.peer_id, self.version, command, message)
+
+
+class QueueElement(object):
+    def __init__(self, handler):
+        self.t = time.time() + handler.polling_rate()
+        self.handler = handler
+
 
 class Node(LM.LoggingProcess):
 
@@ -55,10 +68,15 @@ class Node(LM.LoggingProcess):
         self.__own_ip = None
         self.__own_port = None
         self.__handlers = None
+        self.__handlers_map = None
+        self.__handlers_queue = None
         super(Node, self).__init__(log_queue=log_queue, name="Node Manager", target=self._execute, args=())
 
     def get_peer_manager(self):
         return self.__peer_manager
+
+    def get_peer_handles(self):
+        return self.__peer_map.values()
 
     def connect(self, hostname, port):
         self.mp_queue_put((self.CMD_CONNECT, hostname, port))
@@ -68,8 +86,8 @@ class Node(LM.LoggingProcess):
         self.mp_queue_put((self.CMD_SHUTDOWN, ))
         self.join()
 
-    def send_message(self, peer_id, command, msg):
-        self.__peer_manager.send_message(peer_id, 0, command, msg)
+    def send_message(self, peer_id, version, command, msg):
+        self.__peer_manager.send_message(peer_id, version, command, msg)
 
     def handle_connect(self, hostname, ip, port, peer_id, outgoing):
         peer_handle = PeerHandle(self, hostname, ip, port, peer_id, outgoing)
@@ -82,7 +100,38 @@ class Node(LM.LoggingProcess):
                 address_to=Messages.NetworkAddress(None, 0, ip, port),
                 address_from=Messages.NetworkAddress(None, Messages.PROTOCOL_SERVICES, self.__own_ip, self.__own_port),
             )
-            self.send_message(peer_id, u"version", version_message)
+            self.send_message(peer_id, peer_handle.version, u"version", version_message)
+        for handler in self.__handlers:
+            handler.on_connect(peer_id, peer_handle, hostname, ip, port)
+
+    def __add_polled_handler(self, new_element):
+        i = len(self.__handlers_queue)
+        for element in reversed(self.__handlers_queue):
+            if element.t >= new_element.t:
+                break
+            i -= 1
+        self.__handlers_queue.insert(i, new_element)
+
+    def __get_polled_handler(self):
+        if len(self.__handlers_queue) == 0:
+            return None
+
+        t = time.time()
+
+        newest = self.__handlers_queue[-1]
+
+        if newest.t < t:
+            handler = newest.handler
+            poll_time = handler.polling_rate()
+            newest.t += poll_time
+            if newest.t < t:
+                newest.t = t + poll_time
+            del self.__handlers_queue[-1]
+            self.__add_polled_handler(newest)
+
+            return newest.handler
+        else:
+            return None
 
     def handle_disconnect(self, hostname, port, peer_id):
         LM.info("Disconnected peer %s:%d (%d)" % (hostname, port, peer_id))
@@ -91,15 +140,16 @@ class Node(LM.LoggingProcess):
 
     def handle_message(self, peer_id, command, message):
         peer_handle = self.__peer_map[peer_id]
-        try:
-            handler = self.__handlers[command]
-        except KeyError:
-            handler = None
         if peer_handle:
-            if handler:
-                self.__handlers[command](peer_id, peer_handle, command, message)
+            if command == u"version":
+                self.handle_version(peer_id, peer_handle, command, message)
+            elif command == u"verack":
+                self.handle_verack(peer_id, peer_handle, command, message)
             else:
-                LM.info("Unknown message %s received from %s:%d" % (command, peer_handle.hostname, peer_handle.port))
+                handlers = self.__handlers_map.get(command)
+                if handlers:
+                    for handler in handlers:
+                        handler.handle_message(peer_id, peer_handle, command, message)
         else:
             LM.info("Unknown peer with id %d" % peer_id)
 
@@ -122,27 +172,39 @@ class Node(LM.LoggingProcess):
                     address_from=Messages.NetworkAddress(None, Messages.PROTOCOL_SERVICES, self.__own_ip,
                                                          self.__own_port),
                     )
-                self.send_message(peer_id, "version", version_reply_message)
+                self.send_message(peer_id, peer_handle.version, "version", version_reply_message)
 
         LM.info("Version %d received from %s:%d, using %d" % (version_msg.version, peer_handle.hostname,
                                                               peer_handle.port, peer_handle.version))
-        self.send_message(peer_id, "verack", Messages.VerAck())
-
+        self.send_message(peer_id, peer_handle.version, "verack", Messages.VerAck())
 
     def handle_verack(self, peer_id, peer_handle, command, verack_message):
         pass
 
-    def get_handlers(self):
-        return {
-            u"version": self.handle_version,
-            u"verack": self.handle_verack
-        }
+    def __register_handler(self, handler):
+        if handler.polling_rate():
+            self.__add_polled_handler(QueueElement(handler))
+        self.__handlers.append(handler)
+        commands = handler.required_messages()
+        for command in commands:
+            try:
+                command_handlers = self.__handlers_map[command]
+            except KeyError:
+                command_handlers = None
+
+            if not command_handlers:
+                command_handlers = []
+                self.__handlers_map[command] = command_handlers
+            command_handlers.append(handler)
 
     def __at_start(self):
         self.__peer_map = {}
         self.__own_ip = bytearray(16)
         self.__own_port = 0
-        self.__handlers = self.get_handlers()
+        self.__handlers_map = {}
+        self.__handlers = []
+        self.__handlers_queue = []
+        self.__register_handler(bitcoin.ping_manager.PingManager(self))
         self.__peer_manager = Net.PeerManager(self.__protocol_info, self.get_log_queue())
         self.__peer_manager.start()
 
@@ -172,6 +234,12 @@ class Node(LM.LoggingProcess):
                         port = node_event[2]
                         LM.info("Attempting to connect to %s:%d" % (hostname, port))
                         self.__peer_manager.connect(hostname, port)
+
+                polled_handler = True
+                while polled_handler:
+                    polled_handler = self.__get_polled_handler()
+                    if polled_handler:
+                        polled_handler.poll()
 
                 try:
                     peer_event = self.__peer_manager.mp_queue_get(True, 0.25)
