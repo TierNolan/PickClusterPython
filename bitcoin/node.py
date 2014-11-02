@@ -4,14 +4,14 @@ import network.network
 import bitcoin.protocols
 import Queue
 import logmanager.logmanager
-import bitcoin.messages
+import bitcoin.message
 import bitcoin.ping_manager
 import bitcoin.bitcoin_codec
 import time
 import binascii
 
 Net = network.network
-Messages = bitcoin.messages
+Messages = bitcoin.message
 Protocols = bitcoin.protocols
 LM = logmanager.logmanager
 hexlify = binascii.hexlify

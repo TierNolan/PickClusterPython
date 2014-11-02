@@ -85,7 +85,7 @@ class BinDecoder(object):
         services = self.get_long()
         address = self.get_byte_array(16)
         port = self.get_short()
-        import bitcoin.messages
+        import bitcoin.message
         return bitcoin.messages.NetworkAddress(timestamp, services, address, port)
 
     def get_remaining_buf(self):

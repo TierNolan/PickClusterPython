@@ -13,6 +13,7 @@ PROTOCOL_MIN_VERSION = 60000
 
 CLIENT_NAME = "/PickCluster/"
 
+
 def target_to_bits(i):
     neg = i < 0
 

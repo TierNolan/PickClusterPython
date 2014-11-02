@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import bitcoin.node
 import logmanager.logmanager
 import bitcoin.handler
-import bitcoin.messages
+import bitcoin.message
 import random
 import time
 
@@ -23,7 +23,7 @@ class PingManager(bitcoin.handler.Handler):
             nonce = random.randint(0, 0xFFFFFFFFFFFFFFFF)
             peer_handle.ping_nonce = nonce
             peer_handle.ping_time = t
-            peer_handle.send_message("ping", bitcoin.messages.Ping(nonce))
+            peer_handle.send_message("ping", bitcoin.message.Ping(nonce))
 
     def required_messages(self):
         return "ping", "pong"
@@ -37,7 +37,7 @@ class PingManager(bitcoin.handler.Handler):
     def handle_message(self, peer_id, peer_handle, command, message):
         if command == u"ping" and peer_handle.version > 60000:
             ping = message
-            peer_handle.send_message("pong", bitcoin.messages.Pong(ping.nonce))
+            peer_handle.send_message("pong", bitcoin.message.Pong(ping.nonce))
         elif command == u"pong":
             pong = message
             if peer_handle.ping_nonce and peer_handle.ping_time:

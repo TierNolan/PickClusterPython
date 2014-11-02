@@ -1,9 +1,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import bitcoin.messages
+import bitcoin.message
 import bitcoin.bitcoin_codec
 
-Messages = bitcoin.messages
+Messages = bitcoin.message
 BCodec = bitcoin.bitcoin_codec
 
 class ProtocolError(Exception): pass

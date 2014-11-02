@@ -4,7 +4,7 @@ import hashlib
 
 import bitcoin.byte_array_codec
 import network.network
-import bitcoin.messages
+import bitcoin.message
 
 BAC = bitcoin.byte_array_codec
 
@@ -47,7 +47,7 @@ class MessageCodec(object):
         expected_crc = digest_stream.get_int()
 
         if expected_crc == crc:
-            message_class = bitcoin.messages.get_message(command)
+            message_class = bitcoin.message.get_message(command)
             if message_class:
                 message = message_class()
                 decoder = BAC.BinDecoder(data)
